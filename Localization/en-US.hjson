@@ -194,9 +194,9 @@ Mods: {
 				NightDialogue2: Them jellies, their gentle glow pierces the night, enchantin' all who cast their gaze upon the mystical dance.
 				RainDialogue0: Rain's fallin', and I can't help but hope it's not heraldin' a tempest's fury – the sea's got a wild heart, ye know.
 				RainDialogue1: Lost me rain slicker in a gusty squall a few years back, wishin' for another to shield me from the spray.
-				ShipPromptDialogue0: Ahoy there, ye see that old ship wrecked off yonder? Once she was mine, sailed the seven seas, but those days be behind me now.
-				ShipPromptDialogue1:
+				ShipPromptDialogue0:
 					'''
+					               Ahoy there, ye see that old ship wrecked off yonder? Once she was mine, sailed the seven seas, but those days be behind me now.
 					If you brought me the following materials along with payment:
 					- [i/s150:9]
 					- [i/s20:225] 

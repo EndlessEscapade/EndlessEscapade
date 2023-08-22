@@ -195,14 +195,6 @@ Mods: {
 				RainDialogue0: 但愿这场雨不是飓风的前兆!
 				RainDialogue1: 我在几年前的一个大风天弄丢了我的雨衣. 要是我还有一件就好了.
 				ShipPromptDialogue0: The old ship sitting broken off the pier used to be my old vessel. I'm past my days of sailing, but you look like you want to see the seven seas.
-				ShipPromptDialogue1:
-					'''
-					If you brought me the following materials along with payment:
-					- [i/s150:9]
-					- [i/s20:225] 
-					- [i/s5:73]
-					I'd get 'er fixed right up for ya.
-					'''
 				ShipCommonDialogue0: Before you go sailing, don't forget to make a [i:{0}] to steer your boat
 				ShipCommonDialogue1: And, don't forget that you can always stop by and see if I've designed new sails, wheels, cannons, or other bits and bobs for sailing
 				// ShipRepairDialogue: Thanks be for trustin' me hands – the ship's been put to rights, ready to take on the briny deep once more.

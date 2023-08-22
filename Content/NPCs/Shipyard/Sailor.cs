@@ -5,6 +5,7 @@ using EndlessEscapade.Utilities.Extensions;
 using Terraria;
 using Terraria.Enums;
 using Terraria.GameContent.Bestiary;
+using Terraria.GameContent.Biomes.CaveHouse;
 using Terraria.GameContent.ItemDropRules;
 using Terraria.GameContent.Personalities;
 using Terraria.ID;
@@ -92,18 +93,21 @@ public class Sailor : ModNPC
 
         var player = Main.LocalPlayer;
 
-        var hasMaterials = player.HasItemStack(ItemID.Silk, 20) && player.HasItemStack(ItemID.Wood, 150);
         var hasMoney = player.CanAfford(Item.buyPrice(gold: 5));
 
-        if (!ShipyardSystem.BoatFixed && hasMaterials && hasMoney) {
-            player.ConsumeItemStack(ItemID.Silk, 20);
-            player.ConsumeItemStack(ItemID.Wood, 150);
-            player.PayCurrency(Item.buyPrice(gold: 5));
+        foreach (int wood in RecipeGroup.recipeGroups[RecipeGroupID.Wood].ValidItems) {
+            var hasMaterials = player.HasItemStack(ItemID.Silk, 20) && player.HasItemStack(wood, 150);
 
-            OnBoatRepair.Invoke();
+            if (!ShipyardSystem.BoatFixed && hasMaterials && hasMoney) {
+                player.ConsumeItemStack(ItemID.Silk, 20);
+                player.ConsumeItemStack(wood, 150);
+                player.PayCurrency(Item.buyPrice(gold: 5));
 
-            Main.npcChatText = Mod.GetLocalizationValue("Dialogue.Sailor.ShipRepairDialogue");
-            return;
+                OnBoatRepair.Invoke();
+
+                Main.npcChatText = Mod.GetLocalizationValue("Dialogue.Sailor.ShipRepairDialogue");
+                return;
+            }
         }
 
         var dialogue = ShipyardSystem.BoatFixed ? "CommonDialogue" : "PromptDialogue";
