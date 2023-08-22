@@ -1,4 +1,4 @@
-Mods: {
+﻿Mods: {
 	EndlessEscapade: {
 		Items: {
 			DarkGemsand: {
@@ -196,7 +196,7 @@ Mods: {
 				RainDialogue1: Lost me rain slicker in a gusty squall a few years back, wishin' for another to shield me from the spray.
 				ShipPromptDialogue0:
 					'''
-					               Ahoy there, ye see that old ship wrecked off yonder? Once she was mine, sailed the seven seas, but those days be behind me now.
+					Ahoy there, ye see that old ship wrecked off yonder? Once she was mine, sailed the seven seas, but those days be behind me now.
 					If you brought me the following materials along with payment:
 					- [i/s150:9]
 					- [i/s20:225] 

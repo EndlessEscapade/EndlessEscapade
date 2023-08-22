@@ -110,10 +110,14 @@ public class Sailor : ModNPC
             }
         }
 
-        var dialogue = ShipyardSystem.BoatFixed ? "CommonDialogue" : "PromptDialogue";
-        var selected = $"Dialogue.Sailor.Ship{dialogue}{(Main.rand.NextBool() ? 0 : 1)}";
-
-        Main.npcChatText = Mod.GetLocalizationValue(selected);
+        if (ShipyardSystem.BoatFixed) {
+            var selected = $"Dialogue.Sailor.ShipCommonDialogue{(Main.rand.NextBool() ? 0 : 1)}";
+            Main.npcChatText = Mod.GetLocalizationValue(selected);
+        }
+        else {
+            var selected = "Dialogue.Sailor.ShipPromptDialogue0";
+            Main.npcChatText = Mod.GetLocalizationValue(selected);
+        }
     }
 
     public override string GetChat() {
