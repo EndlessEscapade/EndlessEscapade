@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using EEMod.Seamap.Core;
+using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.Enums;
@@ -39,6 +40,8 @@ public class Wheel : ModTile
     }
 
     public override bool RightClick(int i, int j) {
+        SubworldLibrary.SubworldSystem.Enter<EEMod.Content.Subworlds.Seamap>();
+
         return true;
     }
 

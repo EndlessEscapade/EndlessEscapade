@@ -22,6 +22,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <None Remove="Assets\Textures\Empty.png" />
         <None Remove="Content\Items\Reefs\Kelp\Kelpberries.png" />
     </ItemGroup>
 
