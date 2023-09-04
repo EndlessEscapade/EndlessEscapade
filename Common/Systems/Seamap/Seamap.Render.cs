@@ -1,399 +1,443 @@
-﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using System;
-using Terraria;
-using Terraria.ID;
-using Terraria.ModLoader;
+﻿using System;
 using System.Linq;
-using ReLogic.Content;
-using EEMod.Seamap.Content.Islands;
-using Terraria.UI.Chat;
-using Terraria.GameContent;
 using EndlessEscapade.Common.Players;
 using EndlessEscapade.Content.Seamap.Islands;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Terraria;
+using Terraria.GameContent;
+using Terraria.ModLoader;
+using Terraria.UI.Chat;
 
-namespace EndlessEscapade.Common.Systems.Seamap
+namespace EndlessEscapade.Common.Systems.Seamap;
+
+public partial class Seamap
 {
-    public partial class Seamap
-    {
-        static EEPlayer modPlayer
-        {
-            get => Main.LocalPlayer.GetModPlayer<EEPlayer>();
+    public static int seamapWidth = 5000;
+    public static int seamapHeight = 5000;
+
+    public static float brightness;
+    public static bool isStorming;
+
+    public static float weatherDensity;
+
+    public static float islandTextValue;
+    public static Island lastIsland;
+
+    public static Vector2 permaWindVector;
+
+    private static SeamapPlayer modPlayer => Main.LocalPlayer.GetModPlayer<SeamapPlayer>();
+
+    public static void Render() {
+        var spriteBatch = Main.spriteBatch;
+
+        #region Controlling brightness + weather
+
+        CalculateBrightness();
+
+        if (Main.time % 600 == 0) {
+            if (Main.rand.NextBool(8)) {
+                isStorming = !isStorming;
+            }
         }
 
-        public static int seamapWidth = 5000;
-        public static int seamapHeight = 5000;
+        #endregion
 
-        public static float brightness;
-        public static bool isStorming;
+        if (Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount <= 0 || (Main.LocalPlayer == null && !Main.gameInactive)) {
+            var blackout = ModContent.Request<Texture2D>("EEMod/Textures/Pure").Value;
 
-        public static void Render()
-        {
-            SpriteBatch spriteBatch = Main.spriteBatch;
-
-            #region Controlling brightness + weather
-
-            CalculateBrightness();
-
-            if (Main.time % 600 == 0)
-                if (Main.rand.NextBool(8)) isStorming = !isStorming;
-
-            #endregion
-
-            if (Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount <= 0 ||
-                Main.LocalPlayer == null && !Main.gameInactive)
-            {
-                Texture2D blackout = ModContent.Request<Texture2D>("EEMod/Textures/Pure").Value;
-
-                spriteBatch.Begin();
-
-                spriteBatch.Draw(blackout, new Rectangle(0, 0, Main.screenWidth, Main.screenHeight), Color.Black);
-
-                return;
-            }
-            
             spriteBatch.Begin();
 
-            RenderWater(spriteBatch); //Layer 0
+            spriteBatch.Draw(blackout, new Rectangle(0, 0, Main.screenWidth, Main.screenHeight), Color.Black);
 
-            //Custom rendering primitives for Seamap
+            return;
+        }
 
+        spriteBatch.Begin();
+
+        RenderWater(spriteBatch); //Layer 0
+
+        //Custom rendering primitives for Seamap
+
+        spriteBatch.End();
+
+        if (!Main.dedServ) {
+            //PrimitiveSystem.primitives.DrawTrailsBehindTiles();
+
+            //PrimitiveSystem.primitives.DrawTrailsAboveTiles();
+        }
+
+        spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+
+        RenderEntities(spriteBatch); //Layer 1, postdraw layer 2
+
+        if (!Main.dedServ) {
             spriteBatch.End();
 
-            if (!Main.dedServ)
-            {
-                //PrimitiveSystem.primitives.DrawTrailsBehindTiles();
+            //Particles.Update();
 
-                //PrimitiveSystem.primitives.DrawTrailsAboveTiles();
-            }
+            //Particles.Draw(Main.spriteBatch);
 
             spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
-
-            RenderEntities(spriteBatch); //Layer 1, postdraw layer 2
-
-            if(!Main.dedServ)
-            {
-                spriteBatch.End();
-
-                //Particles.Update();
-
-                //Particles.Draw(Main.spriteBatch);
-
-                spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
-            }
-
-            RenderClouds(spriteBatch); //Layer 3
-
-
-            if (!Main.hideUI) RenderSeamapUI(spriteBatch); //Layer 4
-
-            spriteBatch.End();
         }
 
-        public static void RenderSeamapUI(SpriteBatch spriteBatch)
-        {
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Immediate, null, null, null, null, null, Main.GameViewMatrix.ZoomMatrix);
+        RenderClouds(spriteBatch); //Layer 3
 
-            #region Rendering Disembark
-            bool anyIslands = false;
 
-            foreach (SeamapObject obj in SeamapObjects.SeamapEntities)
-            {
-                if (obj is Island && (obj as Island).cancollide)
-                {
-                    Island island = obj as Island;
-
-                    if (/*island.Hitbox.Intersects(SeamapObjects.localship.Hitbox) && */
-                        Vector2.DistanceSquared(SeamapObjects.localship.Hitbox.Center.ToVector2(), obj.Center) < (obj as Island).interactDistance * (obj as Island).interactDistance)
-                    {
-                        //Main.spriteBatch.DrawString
-                        Vector2 textSize = FontAssets.MouseText.Value.MeasureString("Disembark?");
-                        float textPositionLeft = textSize.X / 2;
-
-                        anyIslands = true;
-                        lastIsland = island;
-
-                        ChatManager.DrawColorCodedString(Main.spriteBatch, FontAssets.MouseText.Value, "Disembark?", island.Center - new Vector2(textPositionLeft, (island.height / 2) + 40) - Main.screenPosition + new Vector2(0, (float)Math.Sin(Main.GameUpdateCount / 15f) * 5f), Color.White * islandTextValue, 0f, Vector2.Zero, Vector2.One);
-                    }
-                }
-            }
-
-            if(anyIslands)
-            {
-                islandTextValue += 0.04f;
-                islandTextValue = MathHelper.Clamp(islandTextValue, 0f, 1f);
-            }
-            else
-            {
-                if(islandTextValue > 0f)
-                {
-                    Vector2 textSize = FontAssets.MouseText.Value.MeasureString("Disembark?");
-                    float textPositionLeft = textSize.X / 2;
-
-                    ChatManager.DrawColorCodedString(Main.spriteBatch, FontAssets.MouseText.Value, "Disembark?", lastIsland.Center - new Vector2(textPositionLeft, (lastIsland.height / 2) + 40) - Main.screenPosition + new Vector2(0, (float)Math.Sin(Main.GameUpdateCount / 15f) * 5f), Color.White * islandTextValue, 0f, Vector2.Zero, Vector2.One);
-                }
-
-                islandTextValue -= 0.08f;
-                islandTextValue = MathHelper.Clamp(islandTextValue, 0f, 1f);
-            }
-            #endregion
-
-            #region Rendering cannonball target
-            Texture2D targetTex = ModContent.Request<Texture2D>("EEMod/Seamap/Content/UI/Target").Value;
-
-            //spriteBatch.Draw(targetTex, SeamapObjects.localship.Center + (Vector2.UnitX.RotatedBy(SeamapObjects.localship.CannonRestrictRange()) * -128) - Main.screenPosition, null, Color.White, Main.GameUpdateCount / 120f, targetTex.TextureCenter(), 1, SpriteEffects.None, 0);
-            spriteBatch.Draw(targetTex,
-                SeamapObjects.localship.Center +
-                (Vector2.UnitX.RotatedBy(SeamapObjects.localship.CannonRestrictRange()) * -MathHelper.Clamp(Vector2.Distance(Main.MouseWorld, SeamapObjects.localship.Center), 0, 128 * Main.GameZoomTarget) / Main.GameZoomTarget)
-                - Main.screenPosition,
-                null, Color.White, Main.GameUpdateCount / 120f, targetTex.TextureCenter(), 1, SpriteEffects.None, 0);
-
-            #endregion
-
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Immediate, null, null, null, null, null, Main.UIScaleMatrix);
-
-            //TODO: move this to an actual UI
-            #region Rendering OCEAN screen thingy
-            if (Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount > 10 && Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount <= 190)
-            {
-                int updateCount = Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount;
-
-                Texture2D oceanLogo = ModContent.Request<Texture2D>("EEMod/Seamap/Content/UI/OceanScreen").Value;
-
-                float yOffset = (updateCount <= 70 ? ((float)Math.Sin((updateCount - 10) * 1.57f / 60f) * 240f) - 120 : (updateCount <= 130 ? 120 : ((float)Math.Sin((updateCount - 70) * 1.57f / 60f) * 240f) - 120));
-
-                spriteBatch.Draw(oceanLogo, new Vector2(Main.screenWidth / 2, yOffset), null, Color.White, 0, new Vector2(186, 92), 1, SpriteEffects.None, 0);
-            }
-            #endregion
-
-            #region Rendering ship healthbar
-            Texture2D healthBar = ModContent.Request<Texture2D>("EEMod/Seamap/Content/UI/HealthbarBg").Value;
-            Texture2D healthBarFill = ModContent.Request<Texture2D>("EEMod/Seamap/Content/UI/HealthbarFill").Value;
-
-            spriteBatch.Draw(healthBar, new Vector2(Main.screenWidth - 200, 40), null, Color.White, 0, Vector2.Zero, 1, SpriteEffects.None, 0);
-
-            spriteBatch.Draw(healthBarFill, new Vector2(Main.screenWidth - 200, 40),
-                new Rectangle(0, 0, (int)((SeamapObjects.localship.shipHelth / SeamapObjects.localship.ShipHelthMax) * 116), 40),
-                Color.White, 0, Vector2.Zero, 1, SpriteEffects.None, 0);
-            #endregion 
+        if (!Main.hideUI) {
+            RenderSeamapUI(spriteBatch); //Layer 4
         }
 
-        public static float weatherDensity;
+        spriteBatch.End();
+    }
 
-        public static float islandTextValue;
-        public static Island lastIsland;
+    public static void RenderSeamapUI(SpriteBatch spriteBatch) {
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Immediate, null, null, null, null, null, Main.GameViewMatrix.ZoomMatrix);
 
-        public static void RenderEntities(SpriteBatch spriteBatch)
-        {
-            static int CompareSeamapEntities(SeamapObject a, SeamapObject b) => a?.Bottom.Y.CompareTo(b?.Bottom.Y ?? 0f) ?? 0;
-            //static bool InactiveOrUnused(SeamapObject obj) => obj?.active != true;
+        #region Rendering Disembark
 
-            var source = SeamapObjects.SeamapEntities;
+        var anyIslands = false;
 
-            SeamapObject[] toDraw = source.Where(p => p?.active == true).ToArray();
-            Array.Sort(toDraw, CompareSeamapEntities);
+        foreach (var obj in SeamapObjects.SeamapEntities) {
+            if (obj is Island && (obj as Island).cancollide) {
+                var island = obj as Island;
 
-            foreach (SeamapObject entity in toDraw)
-            {
-                entity.Draw(spriteBatch);
-            }
+                if ( /*island.Hitbox.Intersects(SeamapObjects.localship.Hitbox) && */
+                    Vector2.DistanceSquared(SeamapObjects.localship.Hitbox.Center.ToVector2(), obj.Center) < (obj as Island).interactDistance * (obj as Island).interactDistance) {
+                    //Main.spriteBatch.DrawString
+                    var textSize = FontAssets.MouseText.Value.MeasureString("Disembark?");
+                    var textPositionLeft = textSize.X / 2;
 
-            foreach (SeamapObject entity in toDraw)
-            {
-                entity.PostDraw(spriteBatch);
+                    anyIslands = true;
+                    lastIsland = island;
+
+                    ChatManager.DrawColorCodedString(
+                        Main.spriteBatch,
+                        FontAssets.MouseText.Value,
+                        "Disembark?",
+                        island.Center - new Vector2(textPositionLeft, island.height / 2 + 40) - Main.screenPosition + new Vector2(0, (float)Math.Sin(Main.GameUpdateCount / 15f) * 5f),
+                        Color.White * islandTextValue,
+                        0f,
+                        Vector2.Zero,
+                        Vector2.One
+                    );
+                }
             }
         }
 
-        static void RenderWater(SpriteBatch spriteBatch)
-        {
-            //EEPlayer eePlayer = Main.LocalPlayer.GetModPlayer<EEPlayer>();
+        if (anyIslands) {
+            islandTextValue += 0.04f;
+            islandTextValue = MathHelper.Clamp(islandTextValue, 0f, 1f);
+        }
+        else {
+            if (islandTextValue > 0f) {
+                var textSize = FontAssets.MouseText.Value.MeasureString("Disembark?");
+                var textPositionLeft = textSize.X / 2;
 
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Immediate, null, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
-
-
-            Texture2D waterTexture = ModContent.Request<Texture2D>("EEMod/Particles/Square").Value;
-
-            Vector2 pos = Vector2.Zero;
-            Vector2 toScreen = pos - Main.screenPosition;
-
-
-            //Tropical water palette
-            //WaterShaderBase.Parameters["icyWaterColor"].SetValue(new Color(6, 90, 133).LightSeamap().ToVector4());
-            //WaterShaderBase.Parameters["neutralWaterColor"].SetValue(new Color(0, 141, 161).LightSeamap().ToVector4());
-            //WaterShaderBase.Parameters["tropicalWaterColor"].SetValue(new Color(19, 216, 205).LightSeamap().ToVector4());
-
-            //Storming palette
-            //WaterShaderBase.Parameters["icyWaterColor"].SetValue(new Color(34, 30, 45).LightSeamap().ToVector4());
-            //WaterShaderBase.Parameters["neutralWaterColor"].SetValue(new Color(44, 44, 68).LightSeamap().ToVector4());
-            //WaterShaderBase.Parameters["tropicalWaterColor"].SetValue(new Color(53, 65, 77).LightSeamap().ToVector4());
-
-            //Neutral water palette
-            WaterShaderBase.Parameters["icyWaterColor"].SetValue(Vector4.Lerp(new Color(52, 75, 136).LightSeamap().ToVector4(), new Color(34, 30, 45).LightSeamap().ToVector4(), weatherDensity));
-            WaterShaderBase.Parameters["neutralWaterColor"].SetValue(Vector4.Lerp(new Color(36, 119, 182).LightSeamap().ToVector4(), new Color(44, 44, 68).LightSeamap().ToVector4(), weatherDensity));
-            WaterShaderBase.Parameters["tropicalWaterColor"].SetValue(Vector4.Lerp(new Color(96, 178, 220).LightSeamap().ToVector4(), new Color(53, 65, 77).LightSeamap().ToVector4(), weatherDensity));
-
-            WaterShaderBase.Parameters["densityNoisemap"].SetValue(ModContent.Request<Texture2D>("EEMod/Textures/Noise/SeamapNoise").Value);
-
-            WaterShaderBase.CurrentTechnique.Passes[0].Apply();
-
-            spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X, (int)toScreen.Y, seamapWidth, seamapHeight), null, Color.White, 0f, Vector2.Zero, SpriteEffects.None, 0f);
-
-            spriteBatch.End(); 
-            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
-
-            foreach (var entity in SeamapObjects.ActiveEntities)
-            {
-                if (entity is not Island)
-                    continue;
-
-                Helpers.DrawAdditive(ModContent.Request<Texture2D>("EEMod/Textures/RadialGradientSquish").Value, entity.Center - Main.screenPosition, Color.Lerp(new Color(96, 178, 220).LightSeamap(), new Color(53, 65, 77).LightSeamap(), weatherDensity) * 0.4f, entity.texture.Width * 2f / 150f);
+                ChatManager.DrawColorCodedString(
+                    Main.spriteBatch,
+                    FontAssets.MouseText.Value,
+                    "Disembark?",
+                    lastIsland.Center - new Vector2(textPositionLeft, lastIsland.height / 2 + 40) - Main.screenPosition + new Vector2(0, (float)Math.Sin(Main.GameUpdateCount / 15f) * 5f),
+                    Color.White * islandTextValue,
+                    0f,
+                    Vector2.Zero,
+                    Vector2.One
+                );
             }
 
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Additive, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
-
-
-            WaterShader.Parameters["noiseTex"].SetValue(ModContent.Request<Texture2D>("EEMod/Textures/Noise/DotNoise2SquishIndex").Value);
-
-            WaterShader.Parameters["baseWaterColor"].SetValue(new Color(0, 0, 0).LightSeamap().ToVector4());
-            WaterShader.Parameters["highlightColor"].SetValue(new Color(5, 5, 5).LightSeamap().ToVector4()); //8,8,8 for storms
-
-            WaterShader.Parameters["sinVal"].SetValue(Main.GameUpdateCount / 1500f); // divided by 1000 for storms
-
-            WaterShader.Parameters["width"].SetValue(1000);
-            WaterShader.Parameters["height"].SetValue(600);
-
-            WaterShader.CurrentTechnique.Passes[0].Apply();
-
-            for (int i = 0; i < seamapWidth / 1000; i++)
-            {
-                for (float j = 0; j < seamapHeight / 1000; j += 0.6f)
-                {
-                    Vector2 arrayOffset = new Vector2(i, j);
-
-                    spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X + (i * 1000), (int)toScreen.Y + (int)(j * 1000), 1000, 600), new Color(0.1f, 0.1f, 0.1f, 0.1f).LightSeamap());
-                }
-            }
-
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+            islandTextValue -= 0.08f;
+            islandTextValue = MathHelper.Clamp(islandTextValue, 0f, 1f);
         }
 
-        public static Vector2 permaWindVector;
+        #endregion
 
-        static void RenderClouds(SpriteBatch spriteBatch)
-        {
-            spriteBatch.End();
+        #region Rendering cannonball target
 
-            Texture2D waterTexture = ModContent.Request<Texture2D>("EEMod/Particles/Square").Value;
+        var targetTex = ModContent.Request<Texture2D>("EEMod/Seamap/Content/UI/Target").Value;
 
-            Color SeaColour = new Color(28 / 255f, 118 / 255f, 186 / 255f);
+        //spriteBatch.Draw(targetTex, SeamapObjects.localship.Center + (Vector2.UnitX.RotatedBy(SeamapObjects.localship.CannonRestrictRange()) * -128) - Main.screenPosition, null, Color.White, Main.GameUpdateCount / 120f, targetTex.TextureCenter(), 1, SpriteEffects.None, 0);
+        spriteBatch.Draw(
+            targetTex,
+            SeamapObjects.localship.Center
+            + Vector2.UnitX.RotatedBy(SeamapObjects.localship.CannonRestrictRange())
+            * -MathHelper.Clamp(Vector2.Distance(Main.MouseWorld, SeamapObjects.localship.Center), 0, 128 * Main.GameZoomTarget)
+            / Main.GameZoomTarget
+            - Main.screenPosition,
+            null,
+            Color.White,
+            Main.GameUpdateCount / 120f,
+            targetTex.Size() / 2f,
+            1,
+            SpriteEffects.None,
+            0
+        );
 
-            Vector2 pos = Vector2.Zero;
-            Vector2 toScreen = pos - Main.screenPosition;
+        #endregion
 
-            if (isStorming && weatherDensity < 1f) weatherDensity += 0.001f;
-            if (!isStorming && weatherDensity > 0f) weatherDensity -= 0.001f;
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Immediate, null, null, null, null, null, Main.UIScaleMatrix);
 
-            spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+        //TODO: move this to an actual UI
 
-            SeamapCloudShader.Parameters["cloudNoisemap"].SetValue(ModContent.Request<Texture2D>("EEMod/Textures/Noise/CloudNoise").Value);
-            SeamapCloudShader.Parameters["densityNoisemap"].SetValue(ModContent.Request<Texture2D>("EEMod/Textures/Noise/SeamapNoise").Value);
+        #region Rendering OCEAN screen thingy
 
-            SeamapCloudShader.Parameters["cloudsColor4"].SetValue((Color.Black * (0.1f + (weatherDensity * 0.1f))).ToVector4());
-            SeamapCloudShader.Parameters["cloudsColor3"].SetValue((Color.Black * (0.1f + (weatherDensity * 0.1f))).ToVector4());
-            SeamapCloudShader.Parameters["cloudsColor2"].SetValue((Color.Black * (0.1f + (weatherDensity * 0.1f))).ToVector4());
-            SeamapCloudShader.Parameters["cloudsColor1"].SetValue((Color.Black * (0.1f + (weatherDensity * 0.1f))).ToVector4());
+        if (Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount > 10 && Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount <= 190) {
+            var updateCount = Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount;
 
-            Vector2 tempWindVector = permaWindVector / 4800f;
+            var oceanLogo = ModContent.Request<Texture2D>("EEMod/Seamap/Content/UI/OceanScreen").Value;
 
-            if (tempWindVector.Y < 0) tempWindVector.Y = 1 + tempWindVector.Y;
-            if (tempWindVector.X < 0) tempWindVector.X = 1 + tempWindVector.X;
+            var yOffset = updateCount <= 70 ? (float)Math.Sin((updateCount - 10) * 1.57f / 60f) * 240f - 120 :
+                updateCount <= 130 ? 120 : (float)Math.Sin((updateCount - 70) * 1.57f / 60f) * 240f - 120;
 
-            SeamapCloudShader.Parameters["wind"].SetValue(tempWindVector);
-
-            SeamapCloudShader.Parameters["weatherDensity"].SetValue(weatherDensity);
-            SeamapCloudShader.Parameters["stepsX"].SetValue(5f);
-            SeamapCloudShader.Parameters["stepsY"].SetValue(4.8f);
-
-            SeamapCloudShader.Parameters["vec"].SetValue(new Vector2(1000, 600));
-
-            for (int i = 0; i < seamapWidth / 1000; i++)
-            {
-                for (float j = -0.6f; j < seamapHeight / 1000; j += 0.6f)
-                {
-                    Vector2 arrayOffset = new Vector2(i, j);
-
-                    SeamapCloudShader.Parameters["arrayOffset"].SetValue(arrayOffset);
-                    SeamapCloudShader.CurrentTechnique.Passes[0].Apply();
-
-                    spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X + (i * 1000), (int)toScreen.Y + (int)(j * 1000) + 100, 1000, 600), Color.White);
-                }
-            }
-
-
-            SeamapCloudShader.Parameters["cloudsColor4"].SetValue(Vector4.Lerp((new Color(218, 221, 237).LightSeamap() * 1f).ToVector4(), (new Color(142, 143, 156).LightSeamap() * 1f).ToVector4(), weatherDensity));
-            SeamapCloudShader.Parameters["cloudsColor3"].SetValue(Vector4.Lerp((new Color(153, 195, 245).LightSeamap() * 0.9f).ToVector4(), (new Color(92, 117, 162).LightSeamap() * 0.9f).ToVector4(), weatherDensity));
-            SeamapCloudShader.Parameters["cloudsColor2"].SetValue(Vector4.Lerp((new Color(153, 195, 245).LightSeamap() * 0.75f).ToVector4(), (new Color(85, 104, 133).LightSeamap() * 0.9f).ToVector4(), weatherDensity));
-            SeamapCloudShader.Parameters["cloudsColor1"].SetValue(Vector4.Lerp((new Color(138, 169, 201).LightSeamap() * 0.7f).ToVector4(), (new Color(49, 76, 119).LightSeamap() * 0.9f).ToVector4(), weatherDensity));
-
-            for (int i = 0; i < seamapWidth / 1000; i++)
-            {
-                for (float j = -0.6f; j < seamapHeight / 1000; j += 0.6f)
-                {
-                    Vector2 arrayOffset = new Vector2(i, j);
-
-                    SeamapCloudShader.Parameters["arrayOffset"].SetValue(arrayOffset);
-                    SeamapCloudShader.CurrentTechnique.Passes[0].Apply();
-
-                    spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X + (i * 1000), (int)toScreen.Y + (int)(j * 1000), 1000, 600), Color.White);
-                }
-            }
-
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
-
-            SeamapBorderVignette.Parameters["color"].SetValue(Vector4.Lerp(Color.White.LightSeamap().ToVector4(), Color.Gray.LightSeamap().ToVector4(), weatherDensity));
-
-            SeamapBorderVignette.CurrentTechnique.Passes[0].Apply();
-
-            spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X, (int)toScreen.Y, 5000, 4800), Color.White);
-
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+            spriteBatch.Draw(oceanLogo, new Vector2(Main.screenWidth / 2, yOffset), null, Color.White, 0, new Vector2(186, 92), 1, SpriteEffects.None, 0);
         }
 
-        static void CalculateBrightness()
-        {
-            if (Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount == 1)
-                brightness = (Main.dayTime ? (isStorming ? 0.5f : 1f) : (isStorming ? 0.5f : 0.2f));
+        #endregion
 
-            if (!isStorming)
-            {
-                if (Main.dayTime)
-                    if (brightness < 1f)
-                        brightness += 0.0025f;
-                else
-                    if (brightness > 0.5f)
-                        brightness -= 0.0025f;
-            }
-            else
-            {
-                if (Main.dayTime)
-                    if (brightness < 0.5f)
-                        brightness += 0.0025f;
-                else
-                    if (brightness > 0.2f)
-                        brightness -= 0.0025f;
-            }
+        #region Rendering ship healthbar
+
+        var healthBar = ModContent.Request<Texture2D>("EEMod/Seamap/Content/UI/HealthbarBg").Value;
+        var healthBarFill = ModContent.Request<Texture2D>("EEMod/Seamap/Content/UI/HealthbarFill").Value;
+
+        spriteBatch.Draw(healthBar, new Vector2(Main.screenWidth - 200, 40), null, Color.White, 0, Vector2.Zero, 1, SpriteEffects.None, 0);
+
+        spriteBatch.Draw(
+            healthBarFill,
+            new Vector2(Main.screenWidth - 200, 40),
+            new Rectangle(0, 0, (int)(SeamapObjects.localship.shipHelth / SeamapObjects.localship.ShipHelthMax * 116), 40),
+            Color.White,
+            0,
+            Vector2.Zero,
+            1,
+            SpriteEffects.None,
+            0
+        );
+
+        #endregion
+    }
+
+    public static void RenderEntities(SpriteBatch spriteBatch) {
+        static int CompareSeamapEntities(SeamapObject a, SeamapObject b) {
+            return a?.Bottom.Y.CompareTo(b?.Bottom.Y ?? 0f) ?? 0;
+        }
+        //static bool InactiveOrUnused(SeamapObject obj) => obj?.active != true;
+
+        var source = SeamapObjects.SeamapEntities;
+
+        var toDraw = source.Where(p => p?.active == true).ToArray();
+        Array.Sort(toDraw, CompareSeamapEntities);
+
+        foreach (var entity in toDraw) {
+            entity.Draw(spriteBatch);
+        }
+
+        foreach (var entity in toDraw) {
+            entity.PostDraw(spriteBatch);
         }
     }
 
-    public static class SeamapExtensions
-    {
-        public static Color LightSeamap(this Color color) => Color.Lerp(color, Color.Black, 1f - Seamap.brightness);
+    private static void RenderWater(SpriteBatch spriteBatch) {
+        //EEPlayer eePlayer = Main.LocalPlayer.GetModPlayer<EEPlayer>();
+
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Immediate, null, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+
+
+        var waterTexture = ModContent.Request<Texture2D>("EEMod/Particles/Square").Value;
+
+        var pos = Vector2.Zero;
+        var toScreen = pos - Main.screenPosition;
+
+
+        //Tropical water palette
+        //WaterShaderBase.Parameters["icyWaterColor"].SetValue(new Color(6, 90, 133).LightSeamap().ToVector4());
+        //WaterShaderBase.Parameters["neutralWaterColor"].SetValue(new Color(0, 141, 161).LightSeamap().ToVector4());
+        //WaterShaderBase.Parameters["tropicalWaterColor"].SetValue(new Color(19, 216, 205).LightSeamap().ToVector4());
+
+        //Storming palette
+        //WaterShaderBase.Parameters["icyWaterColor"].SetValue(new Color(34, 30, 45).LightSeamap().ToVector4());
+        //WaterShaderBase.Parameters["neutralWaterColor"].SetValue(new Color(44, 44, 68).LightSeamap().ToVector4());
+        //WaterShaderBase.Parameters["tropicalWaterColor"].SetValue(new Color(53, 65, 77).LightSeamap().ToVector4());
+
+        //Neutral water palette
+        WaterShaderBase.Parameters["icyWaterColor"].SetValue(Vector4.Lerp(new Color(52, 75, 136).LightSeamap().ToVector4(), new Color(34, 30, 45).LightSeamap().ToVector4(), weatherDensity));
+        WaterShaderBase.Parameters["neutralWaterColor"].SetValue(Vector4.Lerp(new Color(36, 119, 182).LightSeamap().ToVector4(), new Color(44, 44, 68).LightSeamap().ToVector4(), weatherDensity));
+        WaterShaderBase.Parameters["tropicalWaterColor"].SetValue(Vector4.Lerp(new Color(96, 178, 220).LightSeamap().ToVector4(), new Color(53, 65, 77).LightSeamap().ToVector4(), weatherDensity));
+
+        WaterShaderBase.Parameters["densityNoisemap"].SetValue(ModContent.Request<Texture2D>("EEMod/Textures/Noise/SeamapNoise").Value);
+
+        WaterShaderBase.CurrentTechnique.Passes[0].Apply();
+
+        spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X, (int)toScreen.Y, seamapWidth, seamapHeight), null, Color.White, 0f, Vector2.Zero, SpriteEffects.None, 0f);
+
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+
+        foreach (var entity in SeamapObjects.ActiveEntities) {
+            if (entity is not Island) {
+                continue;
+            }
+
+            Helpers.DrawAdditive(
+                ModContent.Request<Texture2D>("EEMod/Textures/RadialGradientSquish").Value,
+                entity.Center - Main.screenPosition,
+                Color.Lerp(new Color(96, 178, 220).LightSeamap(), new Color(53, 65, 77).LightSeamap(), weatherDensity) * 0.4f,
+                entity.texture.Width * 2f / 150f
+            );
+        }
+
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Additive, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+
+
+        WaterShader.Parameters["noiseTex"].SetValue(ModContent.Request<Texture2D>("EEMod/Textures/Noise/DotNoise2SquishIndex").Value);
+
+        WaterShader.Parameters["baseWaterColor"].SetValue(new Color(0, 0, 0).LightSeamap().ToVector4());
+        WaterShader.Parameters["highlightColor"].SetValue(new Color(5, 5, 5).LightSeamap().ToVector4()); //8,8,8 for storms
+
+        WaterShader.Parameters["sinVal"].SetValue(Main.GameUpdateCount / 1500f); // divided by 1000 for storms
+
+        WaterShader.Parameters["width"].SetValue(1000);
+        WaterShader.Parameters["height"].SetValue(600);
+
+        WaterShader.CurrentTechnique.Passes[0].Apply();
+
+        for (var i = 0; i < seamapWidth / 1000; i++) {
+            for (float j = 0; j < seamapHeight / 1000; j += 0.6f) {
+                var arrayOffset = new Vector2(i, j);
+
+                spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X + i * 1000, (int)toScreen.Y + (int)(j * 1000), 1000, 600), new Color(0.1f, 0.1f, 0.1f, 0.1f).LightSeamap());
+            }
+        }
+
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+    }
+
+    private static void RenderClouds(SpriteBatch spriteBatch) {
+        spriteBatch.End();
+
+        var waterTexture = ModContent.Request<Texture2D>("EEMod/Particles/Square").Value;
+
+        var SeaColour = new Color(28 / 255f, 118 / 255f, 186 / 255f);
+
+        var pos = Vector2.Zero;
+        var toScreen = pos - Main.screenPosition;
+
+        if (isStorming && weatherDensity < 1f) {
+            weatherDensity += 0.001f;
+        }
+
+        if (!isStorming && weatherDensity > 0f) {
+            weatherDensity -= 0.001f;
+        }
+
+        spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+
+        SeamapCloudShader.Parameters["cloudNoisemap"].SetValue(ModContent.Request<Texture2D>("EEMod/Textures/Noise/CloudNoise").Value);
+        SeamapCloudShader.Parameters["densityNoisemap"].SetValue(ModContent.Request<Texture2D>("EEMod/Textures/Noise/SeamapNoise").Value);
+
+        SeamapCloudShader.Parameters["cloudsColor4"].SetValue((Color.Black * (0.1f + weatherDensity * 0.1f)).ToVector4());
+        SeamapCloudShader.Parameters["cloudsColor3"].SetValue((Color.Black * (0.1f + weatherDensity * 0.1f)).ToVector4());
+        SeamapCloudShader.Parameters["cloudsColor2"].SetValue((Color.Black * (0.1f + weatherDensity * 0.1f)).ToVector4());
+        SeamapCloudShader.Parameters["cloudsColor1"].SetValue((Color.Black * (0.1f + weatherDensity * 0.1f)).ToVector4());
+
+        var tempWindVector = permaWindVector / 4800f;
+
+        if (tempWindVector.Y < 0) {
+            tempWindVector.Y = 1 + tempWindVector.Y;
+        }
+
+        if (tempWindVector.X < 0) {
+            tempWindVector.X = 1 + tempWindVector.X;
+        }
+
+        SeamapCloudShader.Parameters["wind"].SetValue(tempWindVector);
+
+        SeamapCloudShader.Parameters["weatherDensity"].SetValue(weatherDensity);
+        SeamapCloudShader.Parameters["stepsX"].SetValue(5f);
+        SeamapCloudShader.Parameters["stepsY"].SetValue(4.8f);
+
+        SeamapCloudShader.Parameters["vec"].SetValue(new Vector2(1000, 600));
+
+        for (var i = 0; i < seamapWidth / 1000; i++) {
+            for (var j = -0.6f; j < seamapHeight / 1000; j += 0.6f) {
+                var arrayOffset = new Vector2(i, j);
+
+                SeamapCloudShader.Parameters["arrayOffset"].SetValue(arrayOffset);
+                SeamapCloudShader.CurrentTechnique.Passes[0].Apply();
+
+                spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X + i * 1000, (int)toScreen.Y + (int)(j * 1000) + 100, 1000, 600), Color.White);
+            }
+        }
+
+
+        SeamapCloudShader.Parameters["cloudsColor4"]
+            .SetValue(Vector4.Lerp((new Color(218, 221, 237).LightSeamap() * 1f).ToVector4(), (new Color(142, 143, 156).LightSeamap() * 1f).ToVector4(), weatherDensity));
+        SeamapCloudShader.Parameters["cloudsColor3"]
+            .SetValue(Vector4.Lerp((new Color(153, 195, 245).LightSeamap() * 0.9f).ToVector4(), (new Color(92, 117, 162).LightSeamap() * 0.9f).ToVector4(), weatherDensity));
+        SeamapCloudShader.Parameters["cloudsColor2"]
+            .SetValue(Vector4.Lerp((new Color(153, 195, 245).LightSeamap() * 0.75f).ToVector4(), (new Color(85, 104, 133).LightSeamap() * 0.9f).ToVector4(), weatherDensity));
+        SeamapCloudShader.Parameters["cloudsColor1"]
+            .SetValue(Vector4.Lerp((new Color(138, 169, 201).LightSeamap() * 0.7f).ToVector4(), (new Color(49, 76, 119).LightSeamap() * 0.9f).ToVector4(), weatherDensity));
+
+        for (var i = 0; i < seamapWidth / 1000; i++) {
+            for (var j = -0.6f; j < seamapHeight / 1000; j += 0.6f) {
+                var arrayOffset = new Vector2(i, j);
+
+                SeamapCloudShader.Parameters["arrayOffset"].SetValue(arrayOffset);
+                SeamapCloudShader.CurrentTechnique.Passes[0].Apply();
+
+                spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X + i * 1000, (int)toScreen.Y + (int)(j * 1000), 1000, 600), Color.White);
+            }
+        }
+
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+
+        SeamapBorderVignette.Parameters["color"].SetValue(Vector4.Lerp(Color.White.LightSeamap().ToVector4(), Color.Gray.LightSeamap().ToVector4(), weatherDensity));
+
+        SeamapBorderVignette.CurrentTechnique.Passes[0].Apply();
+
+        spriteBatch.Draw(waterTexture, new Rectangle((int)toScreen.X, (int)toScreen.Y, 5000, 4800), Color.White);
+
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+    }
+
+    private static void CalculateBrightness() {
+        if (Main.LocalPlayer.GetModPlayer<SeamapPlayer>().seamapUpdateCount == 1) {
+            brightness = Main.dayTime ? isStorming ? 0.5f : 1f : isStorming ? 0.5f : 0.2f;
+        }
+
+        if (!isStorming) {
+            if (Main.dayTime) {
+                if (brightness < 1f) {
+                    brightness += 0.0025f;
+                }
+                else if (brightness > 0.5f) {
+                    brightness -= 0.0025f;
+                }
+            }
+        }
+        else {
+            if (Main.dayTime) {
+                if (brightness < 0.5f) {
+                    brightness += 0.0025f;
+                }
+                else if (brightness > 0.2f) {
+                    brightness -= 0.0025f;
+                }
+            }
+        }
+    }
+}
+
+public static class SeamapExtensions
+{
+    public static Color LightSeamap(this Color color) {
+        return Color.Lerp(color, Color.Black, 1f - Seamap.brightness);
     }
 }

@@ -1,6 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
 using Terraria.ModLoader;
-using EEMod.Seamap.Core;
 using Microsoft.Xna.Framework.Graphics;
 using Terraria;
 using EndlessEscapade.Common.Players;
