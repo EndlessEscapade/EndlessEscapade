@@ -7,15 +7,12 @@ namespace EndlessEscapade.Common.Systems.Boids;
 
 public sealed class Boid
 {
-    public Vector2 Acceleration;
-
-    public List<Boid> closeBoids;
-    public float MaxForce = 0.001f;
-    public float MaxVelocity = 2f;
-    public float MaxVision = 32f * 16f;
-
     public Vector2 Position;
     public Vector2 Velocity;
+    public Vector2 Acceleration;
+    
+    public BoidType Type;
+    public BoidFlock Flock;
 
     internal void Update() {
         Velocity += Acceleration;
@@ -24,9 +21,6 @@ public sealed class Boid
         ApplyAllignment();
         ApplySeparation();
         ApplyCohesion();
-
-        ApplyTileAvoidance();
-        ApplyPlayerAvoidance();
     }
 
     private void ApplyAllignment() {
@@ -43,8 +37,8 @@ public sealed class Boid
         }
 
         if (force != Vector2.Zero) {
-            force = force.SafeNormalize(Vector2.Zero) * MaxVelocity;
-            Acceleration += (force - Velocity).Limit(MaxForce);
+            force = force.SafeNormalize(Vector2.Zero) * Type.MaxVelocity;
+            Acceleration += (force - Velocity).Limit(Type.MaxForce);
         }
     }
 
@@ -66,8 +60,8 @@ public sealed class Boid
         }
 
         if (force != Vector2.Zero) {
-            force = force.SafeNormalize(Vector2.Zero) * MaxVelocity;
-            Acceleration += (force - Velocity).Limit(MaxForce);
+            force = force.SafeNormalize(Vector2.Zero) * Type.MaxVelocity;
+            Acceleration += (force - Velocity).Limit(Type.MaxForce);
         }
     }
 
@@ -83,62 +77,35 @@ public sealed class Boid
         if (count > 0) {
             force /= count;
             force -= Position;
-            force = force.SafeNormalize(Vector2.Zero) * MaxVelocity;
+            force = force.SafeNormalize(Vector2.Zero) * Type.MaxVelocity;
         }
 
         if (force != Vector2.Zero) {
-            force = force.SafeNormalize(Vector2.Zero) * MaxVelocity;
-            Acceleration += (force - Velocity).Limit(MaxForce);
+            force = force.SafeNormalize(Vector2.Zero) * Type.MaxVelocity;
+            Acceleration += (force - Velocity).Limit(Type.MaxForce);
         }
     }
 
-    private void ApplyPlayerAvoidance() {
-        var pdist = Vector2.DistanceSquared(Position, Main.LocalPlayer.Center);
+    private void ApplyAvoidance() {
         var force = Vector2.Zero;
+        var dist = Vector2.DistanceSquared(Position, Main.LocalPlayer.Center);
 
-        if (pdist < MaxVision * MaxVision && pdist > 0) {
-            var d = Position - Main.LocalPlayer.Center;
-            var norm = Vector2.Normalize(d);
-            var weight = norm;
-            force += weight;
+        if (dist < Type.MaxVision * Type.MaxVision && dist > 0) {
+            var diff = Position - Main.LocalPlayer.Center;
+            var norm = diff.SafeNormalize(Vector2.Zero);
+            force += norm;
         }
 
         if (force != Vector2.Zero) {
-            force = Vector2.Normalize(force) * MaxVelocity;
-            Acceleration += (force - Velocity).Limit(MaxForce);
-        }
-    }
-
-    private void ApplyTileAvoidance() {
-        var force = Vector2.Zero;
-        var tilePos = Position.ToTileCoordinates();
-        
-        for (var i = -1; i < 2; i++) {
-            for (var j = -1; j < 2; j++) {
-                if (!WorldGen.InWorld(tilePos.X + i, tilePos.Y + j, 10)) {
-                    continue;
-                }
-                
-                var tile = Framing.GetTileSafely(tilePos.X + i, tilePos.Y + j);
-                var pdist = Vector2.DistanceSquared(Position, new Vector2(tilePos.X + i, tilePos.Y + j) * 16);
-                    
-                if ((pdist < MaxVision * MaxVision && pdist > 0 && tile.HasTile && Main.tileSolid[tile.TileType]) || tile.LiquidAmount < 100) {
-                    var distance = Position - new Vector2(tilePos.X + i, tilePos.Y + j) * 16f;
-                    force += distance.SafeNormalize(Vector2.Zero);
-                }
-            }
-        }
-
-        if (force != Vector2.Zero) {
-            force = Vector2.Normalize(force) * MaxVelocity;
-            Acceleration += (force - Velocity).Limit(MaxForce);
+            force = Vector2.Normalize(force) * Type.MaxVelocity;
+            Acceleration += (force - Velocity).Limit(Type.MaxForce);
         }
     }
 
     private IEnumerable<Boid> GetCloseBoids() {
-        foreach (var boid in closeBoids) {
+        foreach (var boid in Flock.Boids) {
             var distance = Vector2.DistanceSquared(Position, boid.Position);
-            var inRange = distance < MaxVision * MaxVision && distance > 0f;
+            var inRange = distance < Type.MaxVision * Type.MaxVision && distance > 0f;
 
             if (inRange) {
                 yield return boid;

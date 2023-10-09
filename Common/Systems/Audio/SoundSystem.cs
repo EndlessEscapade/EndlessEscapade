@@ -29,7 +29,7 @@ public sealed class SoundSystem : ModSystem
 
     public static SoundModifiers SoundParameters { get; private set; }
 
-    public override void Load() {
+    public override void OnModLoad() {
         Enabled = SoundEngine.IsAudioSupported;
 
         if (!Enabled) {
