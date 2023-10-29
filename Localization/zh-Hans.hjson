@@ -1,5 +1,7 @@
 Mods: {
 	EndlessEscapade: {
+		// Common.AttachmentInfo: Boat Attachment
+
 		Items: {
 			DarkGemsand: {
 				DisplayName: 暗黑宝石砂
@@ -160,6 +162,36 @@ Mods: {
 				// DisplayName: Wood Figurehead
 				// Tooltip: ""
 			}
+
+			DolphinFin: {
+				// DisplayName: Dolphin Fin
+				// Tooltip: ""
+			}
+
+			FishGills: {
+				// DisplayName: Fish Gills
+				// Tooltip: ""
+			}
+
+			GreatShell: {
+				// DisplayName: Great Shell
+				// Tooltip: ""
+			}
+
+			RadiantPearl: {
+				// DisplayName: Radiant Pearl
+				// Tooltip: ""
+			}
+
+			LythenBar: {
+				// DisplayName: Lythen Bar
+				// Tooltip: ""
+			}
+
+			LythenOre: {
+				// DisplayName: Lythen Ore
+				// Tooltip: ""
+			}
 		}
 
 		NPCs: {
@@ -239,15 +271,12 @@ Mods: {
 
 				LowPassFilteringIntensity: {
 					// Label: Low Pass Filtering Intensity
-					/* Tooltip:
-						'''
-						Set to 1 for full effect intensity, set to 0 for disabling.
-						This is used for effects such as muffling sounds, etc.
-						''' */
+					// Tooltip: Set to 1 for full effect intensity, set to 0 for disabling.
 				}
 			}
 		}
 
 		Buttons.Sailor.Sailing: 航行
+		// Tiles.LythenOre.MapEntry: Lythen Ore
 	}
 }

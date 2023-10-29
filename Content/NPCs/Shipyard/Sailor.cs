@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using EndlessEscapade.Common.Systems.Shipyard;
+using EndlessEscapade.Common.Systems.Generation;
+using EndlessEscapade.Content.Films;
 using EndlessEscapade.Content.Items.Shipyard;
 using EndlessEscapade.Utilities.Extensions;
 using Terraria;
+using Terraria.Cinematics;
 using Terraria.Enums;
 using Terraria.GameContent.Bestiary;
 using Terraria.GameContent.ItemDropRules;
@@ -26,6 +28,8 @@ public class Sailor : ModNPC
     public static event Action OnBoatRepair;
 
     public override void SetStaticDefaults() {
+        Main.npcFrameCount[Type] = 25;
+
         NPCID.Sets.ExtraFramesCount[Type] = 9;
         NPCID.Sets.AttackFrameCount[Type] = 4;
         NPCID.Sets.DangerDetectRange[Type] = 700;
@@ -35,9 +39,7 @@ public class Sailor : ModNPC
         NPCID.Sets.HatOffsetY[Type] = 4;
         NPCID.Sets.NPCBestiaryDrawOffset.Add(
             Type,
-            new NPCID.Sets.NPCBestiaryDrawModifiers(0) {
-                Velocity = 1f
-            }
+            new NPCID.Sets.NPCBestiaryDrawModifiers()
         );
 
         NPC.Happiness.SetNPCAffection(NPCID.Pirate, AffectionLevel.Hate);
@@ -48,8 +50,6 @@ public class Sailor : ModNPC
         NPC.Happiness.SetBiomeAffection<OceanBiome>(AffectionLevel.Love);
         NPC.Happiness.SetBiomeAffection<DesertBiome>(AffectionLevel.Like);
         NPC.Happiness.SetBiomeAffection<UndergroundBiome>(AffectionLevel.Hate);
-
-        Main.npcFrameCount[Type] = 25;
     }
 
     public override void SetBestiary(BestiaryDatabase database, BestiaryEntry bestiaryEntry) {
@@ -94,13 +94,12 @@ public class Sailor : ModNPC
         button = Language.GetTextValue("LegacyInterface.28");
         button2 = Mod.GetLocalizationValue("Buttons.Sailor.Sailing");
     }
-
+    
     public override void OnChatButtonClicked(bool firstButton, ref string shopName) {
         if (firstButton) {
             shopName = "Shop";
             return;
         }
-
 
         var player = Main.LocalPlayer;
 
@@ -109,13 +108,13 @@ public class Sailor : ModNPC
 
         if (!ShipyardSystem.Repaired) {
             if (hasMaterials && hasMoney && oldShipDialogue == RepairPromptDialogue) {
-                var repaired = true;
+                var success = true;
 
-                repaired &= player.PayCurrency(Item.buyPrice(gold: 5));
-                repaired &= player.TryConsumeStack(ItemID.Silk, 20);
-                repaired &= player.TryConsumeGroupStack(RecipeGroupID.Wood, 150);
+                success &= player.PayCurrency(Item.buyPrice(gold: 5));
+                success &= player.TryConsumeStack(ItemID.Silk, 20);
+                success &= player.TryConsumeGroupStack(RecipeGroupID.Wood, 150);
 
-                if (repaired) {
+                if (success) {
                     OnBoatRepair.Invoke();
 
                     Main.npcChatText = Mod.GetLocalizationValue("Dialogue.Sailor.ShipRepairDialogue");
@@ -166,13 +165,11 @@ public class Sailor : ModNPC
 
         return chat.Get();
     }
-
+    
     public override List<string> SetNPCNameList() {
-        return new List<string> {
-            "Skipper"
-        };
+        return new List<string> { "Skipper" };
     }
-
+    
     public override void TownNPCAttackStrength(ref int damage, ref float knockback) {
         damage = 20;
         knockback = 4f;
@@ -192,7 +189,7 @@ public class Sailor : ModNPC
         multiplier = 12f;
         randomOffset = 2f;
     }
-
+    
     public override bool CanTownNPCSpawn(int numTownNPCs) {
         return true;
     }
