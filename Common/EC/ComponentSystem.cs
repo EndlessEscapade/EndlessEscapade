@@ -6,7 +6,7 @@ namespace EndlessEscapade.Common.EC;
 
 public sealed class ComponentSystem : ModSystem
 {
-    private readonly record struct ComponentTypeData(Action Remove);
+    private readonly record struct ComponentTypeData(Action<int, int> Remove, Func<int, int, bool> Has);
     
     private static class ComponentData<T> where T : Component
     {
@@ -24,10 +24,16 @@ public sealed class ComponentSystem : ModSystem
             
                 Array.Resize(ref componentData, newSize);
             }
+
+            componentData[Id] = new ComponentTypeData(Remove, Has);
         }
 
         public static void Remove(int entityId, int componentId) {
             Remove<T>(entityId);
+        }
+
+        public static bool Has(int entityId, int componentId) {
+            return Has<T>(entityId);
         }
     }
     
@@ -36,7 +42,11 @@ public sealed class ComponentSystem : ModSystem
     public static int ComponentTypeCount { get; private set; }
 
     public static void Remove(int entityId, int componentId) {
-        componentData[componentId].Remove();
+        componentData[componentId].Remove(entityId, componentId);
+    }
+
+    public static bool Has(int entityId, int componentId) {
+        return componentData[componentId].Has(entityId, componentId);
     }
     
     public static bool Has<T>(int entityId) where T : Component {
