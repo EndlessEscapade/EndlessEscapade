@@ -10,37 +10,38 @@ public sealed class EntitySystem : ModSystem
 {
     private struct EntityData
     {
+        public readonly List<int> ActiveComponentIds = new();
+        
         public EntityData() { }
     }
-
-    private static EntityData[] Data = Array.Empty<EntityData>();
 
     private static readonly List<int> ActiveEntityIds = new();
     private static readonly List<int> InactiveEntityIds = new();
 
     private static readonly ConcurrentBag<int> FreeEntityIds = new();
     
-    private static int NextEntityId;
-
-
+    private static EntityData[] entityData = Array.Empty<EntityData>();
+    
+    private static int nextEntityId;
+    
     public static Entity Create(bool activate) {
         int entityId;
 
         if (!FreeEntityIds.TryTake(out entityId)) {
-            entityId = NextEntityId++;
+            entityId = nextEntityId++;
         }
 
-        if (entityId >= Data.Length) {
-            var newSize = Math.Max(1, Data.Length);
+        if (entityId >= entityData.Length) {
+            var newSize = Math.Max(1, entityData.Length);
 
             while (newSize <= entityId) {
                 newSize *= 2;
             }
             
-            Array.Resize(ref Data, newSize);
+            Array.Resize(ref entityData, newSize);
         }
         
-        Data[entityId] = new EntityData();
+        entityData[entityId] = new EntityData();
 
         if (activate) {
             ActiveEntityIds.Add(entityId);
@@ -50,12 +51,16 @@ public sealed class EntitySystem : ModSystem
     }
 
     public static void Remove(int entityId) {
-        if (entityId < 0 || entityId >= Data.Length) {
+        if (entityId < 0 || entityId >= entityData.Length) {
             return;
         }
-        
-        // TODO: Find a way to remove components from the entity.
 
+        var data = entityData[entityId];
+
+        foreach (var componentId in data.ActiveComponentIds) {
+            ComponentSystem.Remove(entityId, componentId);
+        }
+        
         ActiveEntityIds.Remove(entityId);
         InactiveEntityIds.Remove(entityId);
 
@@ -63,7 +68,7 @@ public sealed class EntitySystem : ModSystem
     }
 
     public static bool GetActive(int entityId) {
-        if (entityId < 0 || entityId >= Data.Length) {
+        if (entityId < 0 || entityId >= entityData.Length) {
             return false;
         }
         
@@ -71,7 +76,7 @@ public sealed class EntitySystem : ModSystem
     }
 
     public static void SetActive(int entityId, bool active) {
-        if (entityId < 0 || entityId >= Data.Length) {
+        if (entityId < 0 || entityId >= entityData.Length) {
             return;
         }
         

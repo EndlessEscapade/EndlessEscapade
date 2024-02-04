@@ -4,19 +4,41 @@ using Terraria.ModLoader;
 
 namespace EndlessEscapade.Common.EC;
 
-// TODO: Hook callbacks.
 public sealed class ComponentSystem : ModSystem
 {
+    private readonly record struct ComponentTypeData(Action Remove);
+    
     private static class ComponentData<T> where T : Component
     {
         public static readonly int Id = ComponentTypeCount++;
-        public static readonly int Mask = 1 << Id;
         
         public static T?[] Components = Array.Empty<T>();
+
+        static ComponentData() {
+            if (Id >= componentData.Length) {
+                var newSize = Math.Max(1, componentData.Length);
+
+                while (newSize <= Id) {
+                    newSize *= 2;
+                }
+            
+                Array.Resize(ref componentData, newSize);
+            }
+        }
+
+        public static void Remove(int entityId, int componentId) {
+            Remove<T>(entityId);
+        }
     }
+    
+    private static ComponentTypeData[] componentData = Array.Empty<ComponentTypeData>();
 
     public static int ComponentTypeCount { get; private set; }
 
+    public static void Remove(int entityId, int componentId) {
+        componentData[componentId].Remove();
+    }
+    
     public static bool Has<T>(int entityId) where T : Component {
         if (entityId < 0 || entityId >= ComponentData<T>.Components.Length) {
             return false;
@@ -43,7 +65,7 @@ public sealed class ComponentSystem : ModSystem
             
             Array.Resize(ref ComponentData<T>.Components, newSize);
         }
-        
+
         ComponentData<T>.Components[entityId] = component;
 
         return ComponentData<T>.Components[entityId];
